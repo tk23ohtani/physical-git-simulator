@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>物理Gitゲーム - Content Matrix台紙</title>
+<style>
+  @page {
+    size: A3 landscape;
+    margin: 10mm;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; }
+
+  .page {
+    width: 400mm; height: 277mm;
+    padding: 8mm;
+    display: flex; flex-direction: column;
+  }
+
+  .header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 5mm; padding-bottom: 3mm;
+    border-bottom: 2px solid #3B82F6;
+  }
+  .header h1 { font-size: 18pt; color: #3B82F6; }
+  .header .rule {
+    font-size: 10pt; color: #555;
+    background: #EFF6FF; padding: 2mm 5mm; border-radius: 4px;
+  }
+
+  .matrix {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 28mm repeat(4, 1fr);
+    grid-template-rows: 20mm repeat(4, 1fr);
+    gap: 0;
+  }
+
+  .corner {
+    background: #F8FAFC;
+    border: 2px solid #93C5FD;
+    border-radius: 6px 0 0 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8pt; color: #999;
+  }
+  .col-header {
+    background: #EFF6FF;
+    border: 2px solid #93C5FD;
+    border-left: none;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 28pt; color: #3B82F6;
+  }
+  .col-header:last-child { border-radius: 0 6px 0 0; }
+
+  .row-header {
+    background: #EFF6FF;
+    border: 2px solid #93C5FD;
+    border-top: none;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 32pt; color: #3B82F6;
+  }
+  .row-header.last-row { border-radius: 0 0 0 6px; }
+
+  .cell {
+    border: 2px solid #93C5FD;
+    border-top: none;
+    border-left: none;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 3mm;
+    background: #FAFCFF;
+  }
+  .cell.last-col { border-radius: 0; }
+  .cell.last-row.last-col { border-radius: 0 0 6px 0; }
+
+  .cell-id {
+    font-size: 10pt; color: #93C5FD; font-weight: bold;
+    margin-bottom: 2mm;
+  }
+  .cell-hint {
+    font-size: 8pt; color: #ddd; font-style: italic;
+  }
+
+  .footer {
+    margin-top: 4mm;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 9pt; color: #888;
+  }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="header">
+    <h1>📦 Content Matrix（中身 → Blob ID 検索台帳）</h1>
+    <div class="rule">同じ中身のBlobは作らない -- ここで中身を探して、既存の Blob ID を使い回す！</div>
+  </div>
+
+  <div class="matrix" id="matrix"></div>
+
+  <div class="footer">
+    <div>使い方: Blobを新規作成したら該当マスに付箋を貼りBlob IDを記入 / Treeを書くときはここで中身を探して既存のBlob IDを確認</div>
+    <div>物理Gitゲーム | A3横 印刷</div>
+  </div>
+</div>
+
+<script>
+const shapes = ['○', '×', '△', '□'];
+const numbers = [1, 2, 3, 4];
+const matrix = document.getElementById('matrix');
+
+// corner
+matrix.innerHTML = '<div class="corner">形状＼数字</div>';
+
+// column headers
+for (const n of numbers) {
+  matrix.innerHTML += `<div class="col-header">${n}</div>`;
+}
+
+// rows
+for (let r = 0; r < shapes.length; r++) {
+  const isLast = r === shapes.length - 1;
+  matrix.innerHTML += `<div class="row-header ${isLast ? 'last-row' : ''}">${shapes[r]}</div>`;
+  for (let c = 0; c < numbers.length; c++) {
+    const isLastCol = c === numbers.length - 1;
+    matrix.innerHTML += `
+      <div class="cell ${isLast ? 'last-row' : ''} ${isLastCol ? 'last-col' : ''}">
+        <span class="cell-id">${shapes[r]}-${numbers[c]}</span>
+        <span class="cell-hint">Blob付箋<br>をここに貼る<br>ID: B___</span>
+      </div>`;
+  }
+}
+</script>
+
+</body>
+</html>
