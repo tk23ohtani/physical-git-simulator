@@ -163,7 +163,7 @@ describe("エラーハンドリング統合テスト", () => {
   // 9. CHECKOUT_COMMIT → Detached HEAD notification (要件 5.2)
   // -------------------------------------------------------------------------
   it("CHECKOUT_COMMIT sets Detached HEAD notification", () => {
-    let state = stateWithCommit();
+    const state = stateWithCommit();
     const commit = state.objectStore.getAllByType("commit")[0];
     const next = simulatorReducer(state, {
       type: "CHECKOUT_COMMIT",

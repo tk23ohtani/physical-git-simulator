@@ -31,12 +31,12 @@ export class IDGenerator {
     return copy;
   }
 
-  generate(objectType: "blob" | "tree" | "commit", _content: string): ObjectId {
+  generate(objectType: "blob" | "tree" | "commit", content: string): ObjectId {
     switch (this.mode) {
       case "sequential":
         return this.generateSequential(objectType);
       case "pseudo-hash":
-        return this.generatePseudoHash();
+        return this.generatePseudoHash(content);
     }
   }
 
@@ -53,7 +53,8 @@ export class IDGenerator {
     return `${objectType}-${this.counters[objectType]}`;
   }
 
-  private generatePseudoHash(): ObjectId {
+  private generatePseudoHash(content: string): ObjectId {
+    void content;
     const bytes = new Uint8Array(4);
     crypto.getRandomValues(bytes);
     return Array.from(bytes)

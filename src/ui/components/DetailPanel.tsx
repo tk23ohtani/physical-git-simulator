@@ -1,4 +1,4 @@
-import { useSimulator } from "../../state/context";
+import { useSimulator } from "../../state/use-simulator";
 import type { ObjectId, Blob, Tree, Commit, GitObject } from "../../core/types";
 import type { StepRecord } from "../../state/types";
 

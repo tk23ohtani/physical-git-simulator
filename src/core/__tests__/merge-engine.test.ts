@@ -3,7 +3,14 @@ import { MergeEngine, classifyBlobMerge } from '../merge-engine'
 import { ObjectStore } from '../object-store'
 import { RefStore } from '../ref-store'
 import { IDGenerator } from '../id-generator'
-import type { ObjectId, Commit, ConflictEntry } from '../types'
+import type {
+  ObjectId,
+  Commit,
+  ConflictEntry,
+  FastForwardResult,
+  NormalMergeResult,
+  ConflictResult,
+} from '../types'
 
 /**
  * MergeEngine テスト
@@ -149,7 +156,7 @@ describe('MergeEngine', () => {
       const result = mergeEngine.merge('feature', 'main')
 
       expect(result.type).toBe('fast-forward')
-      expect((result as any).targetCommitId).toBe(commitC.id)
+      expect((result as FastForwardResult).targetCommitId).toBe(commitC.id)
       // main branch should now point to commitC
       expect(refStore.getBranch('main')).toBe(commitC.id)
     })
@@ -193,7 +200,7 @@ describe('MergeEngine', () => {
       const result = mergeEngine.merge('feature', 'main')
 
       expect(result.type).toBe('normal')
-      const normalResult = result as any
+      const normalResult = result as NormalMergeResult
       expect(normalResult.mergeCommit).toBeDefined()
       expect(normalResult.mergeCommit.parentIds).toHaveLength(2)
       expect(normalResult.mergeCommit.parentIds).toContain(mainCommit.id)
@@ -223,7 +230,7 @@ describe('MergeEngine', () => {
       expect(result.type).toBe('normal')
 
       // Verify the merge commit's tree contains all files
-      const mergeCommit = (result as any).mergeCommit as Commit
+      const mergeCommit = (result as NormalMergeResult).mergeCommit as Commit
       const tree = objectStore.get(mergeCommit.treeId)
       expect(tree).toBeDefined()
       expect(tree!.type).toBe('tree')
@@ -253,7 +260,7 @@ describe('MergeEngine', () => {
       refStore.moveBranch('feature', featureCommit.id)
 
       const result = mergeEngine.merge('feature', 'main')
-      const mergeCommit = (result as any).mergeCommit as Commit
+      const mergeCommit = (result as NormalMergeResult).mergeCommit as Commit
 
       expect(refStore.getBranch('main')).toBe(mergeCommit.id)
     })
@@ -286,7 +293,7 @@ describe('MergeEngine', () => {
       const result = mergeEngine.merge('feature', 'main')
 
       expect(result.type).toBe('conflict')
-      const conflictResult = result as any
+      const conflictResult = result as ConflictResult
       expect(conflictResult.conflicts).toHaveLength(1)
       expect(conflictResult.conflicts[0].path).toBe('a.txt')
       expect(conflictResult.conflicts[0].ancestor).toBe('original')
@@ -320,7 +327,7 @@ describe('MergeEngine', () => {
       const result = mergeEngine.merge('feature', 'main')
 
       expect(result.type).toBe('conflict')
-      const conflictResult = result as any
+      const conflictResult = result as ConflictResult
       expect(conflictResult.conflicts).toHaveLength(2)
       const paths = conflictResult.conflicts.map((c: ConflictEntry) => c.path).sort()
       expect(paths).toEqual(['a.txt', 'b.txt'])

@@ -1,4 +1,5 @@
-import { SimulatorProvider, useSimulator } from "./state/context";
+import { SimulatorProvider } from "./state/context";
+import { useSimulator } from "./state/use-simulator";
 import { CommandPanel } from "./ui/components/CommandPanel";
 import { DAGGraphView } from "./ui/components/DAGGraphView";
 import { DetailPanel } from "./ui/components/DetailPanel";

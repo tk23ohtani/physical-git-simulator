@@ -1,4 +1,4 @@
-import { useSimulator } from "../../state/context";
+import { useSimulator } from "../../state/use-simulator";
 import { calculateDAGLayout, NODE_SPACING_X } from "../dag-layout";
 import type { DAGNode, DAGLayout } from "../dag-layout";
 import type { ObjectId } from "../../core/types";

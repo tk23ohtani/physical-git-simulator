@@ -46,7 +46,7 @@ describe('ObjectStore', () => {
 
       expect(Object.isFrozen(blob)).toBe(true)
       expect(() => {
-        ;(blob as any).content = 'changed'
+        ;(blob as { content: string }).content = 'changed'
       }).toThrow()
     })
   })
@@ -94,7 +94,7 @@ describe('ObjectStore', () => {
       expect(Object.isFrozen(tree)).toBe(true)
       expect(Object.isFrozen(tree.entries)).toBe(true)
       expect(() => {
-        ;(tree as any).entries = []
+        ;((tree as unknown) as { entries: unknown[] }).entries = []
       }).toThrow()
     })
   })
@@ -182,7 +182,7 @@ describe('ObjectStore', () => {
       expect(Object.isFrozen(commit)).toBe(true)
       expect(Object.isFrozen(commit.parentIds)).toBe(true)
       expect(() => {
-        ;(commit as any).message = 'changed'
+        ;(commit as { message: string }).message = 'changed'
       }).toThrow()
     })
   })

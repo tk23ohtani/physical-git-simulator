@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSimulator } from "../../state/context";
+import { useSimulator } from "../../state/use-simulator";
 import type { ConflictEntry, ResolveChoice, BlobContent, BlobWord1, BlobWord2 } from "../../core/types";
 import { BLOB_WORD1, BLOB_WORD2 } from "../../core/types";
 
