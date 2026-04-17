@@ -1,263 +1,386 @@
 import { useSimulator } from "../../state/use-simulator";
-import { calculateDAGLayout, NODE_SPACING_X } from "../dag-layout";
-import type { DAGNode, DAGLayout } from "../dag-layout";
-import type { ObjectId } from "../../core/types";
+import type { Blob, Commit, ObjectId, Tree } from "../../core/types";
+import { formatObjectId } from "../id-format";
 
 // =============================================================================
-// DAGGraphView - Commit履歴のDAGグラフをSVG描画
+// DAGGraphView - 中央ペインの盤面表示
 // =============================================================================
 
-/** Design colors */
 const COLORS = {
+  blob: "#3B82F6",
+  tree: "#10B981",
   commit: "#F59E0B",
   branch: "#8B5CF6",
   head: "#EF4444",
-  edge: "#6B7280",
   text: "#1F2937",
-  bg: "#FAFAFA",
+  bg: "#F6F1E8",
+  panel: "#FBF7F0",
+  border: "#D6CCB8",
+  muted: "#6B7280",
 } as const;
 
-const NODE_RADIUS = 30;
-const PADDING = 60;
-const BRANCH_LABEL_OFFSET_X = 30;
-const HEAD_LABEL_OFFSET_Y = -16;
+const boardStyle: React.CSSProperties = {
+  minHeight: "100%",
+  background:
+    "linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0))," +
+    "repeating-linear-gradient(0deg, rgba(120,94,54,0.05), rgba(120,94,54,0.05) 1px, transparent 1px, transparent 28px)",
+  padding: 20,
+};
 
-// =============================================================================
-// Sub-components
-// =============================================================================
+const columnStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+  minWidth: 260,
+};
 
-function EdgeLine({
-  fromNode,
-  toNode,
+const noteBaseStyle: React.CSSProperties = {
+  borderRadius: 14,
+  border: "1px solid rgba(31,41,55,0.08)",
+  boxShadow: "0 10px 24px rgba(31,41,55,0.10), inset 0 1px 0 rgba(255,255,255,0.5)",
+  padding: 14,
+  color: COLORS.text,
+};
+
+function getRotation(index: number): string {
+  const rotations = ["rotate(-1deg)", "rotate(0.6deg)", "rotate(-0.4deg)", "rotate(1deg)"];
+  return rotations[index % rotations.length];
+}
+
+function pinStyle(color: string): React.CSSProperties {
+  return {
+    width: 14,
+    height: 14,
+    borderRadius: 999,
+    background: color,
+    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+    position: "absolute",
+    top: 10,
+    right: 12,
+  };
+}
+
+function NoteShell({
+  color,
+  index,
+  highlighted = false,
+  children,
 }: {
-  fromNode: DAGNode;
-  toNode: DAGNode;
+  color: string;
+  index: number;
+  highlighted?: boolean;
+  children: React.ReactNode;
 }) {
-  const x1 = fromNode.x + PADDING;
-  const y1 = fromNode.y + PADDING + NODE_RADIUS;
-  const x2 = toNode.x + PADDING;
-  const y2 = toNode.y + PADDING - NODE_RADIUS;
-
   return (
-    <line
-      x1={x1}
-      y1={y1}
-      x2={x2}
-      y2={y2}
-      stroke={COLORS.edge}
-      strokeWidth={2}
-      markerEnd="url(#arrowhead)"
-    />
+    <div
+      style={{
+        ...noteBaseStyle,
+        position: "relative",
+        background: `linear-gradient(180deg, ${color}, rgba(255,255,255,0.45))`,
+        transform: getRotation(index),
+        outline: highlighted ? `3px solid ${COLORS.head}` : "none",
+        outlineOffset: 2,
+      }}
+    >
+      <div style={pinStyle("rgba(255,255,255,0.92)")} />
+      {children}
+    </div>
   );
 }
 
-function CommitNode({
-  node,
+function StickyHeader({
+  title,
+  subtitle,
+  color,
+}: {
+  title: string;
+  subtitle: string;
+  color: string;
+}) {
+  return (
+    <div
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 1,
+        background: COLORS.panel,
+        border: `1px solid ${COLORS.border}`,
+        borderRadius: 14,
+        padding: "10px 12px",
+        boxShadow: "0 4px 10px rgba(31,41,55,0.06)",
+      }}
+    >
+      <div style={{ fontSize: 14, fontWeight: 800, color }}>{title}</div>
+      <div style={{ fontSize: 11, color: COLORS.muted }}>{subtitle}</div>
+    </div>
+  );
+}
+
+function ClickableNote({
+  objectId,
+  color,
+  index,
+  highlighted,
+  children,
   onClick,
 }: {
-  node: DAGNode;
+  objectId: ObjectId;
+  color: string;
+  index: number;
+  highlighted?: boolean;
+  children: React.ReactNode;
   onClick: (id: ObjectId) => void;
 }) {
-  const cx = node.x + PADDING;
-  const cy = node.y + PADDING;
-  const label = node.commitId.length > 10 ? node.commitId.slice(0, 10) : node.commitId;
-
-  // monospace の1文字幅はおよそ fontSize * 0.6。ノード内径に収まるフォントサイズを算出
-  const innerWidth = NODE_RADIUS * 2 * 0.75; // 直径の75%を使う
-  const charWidthRatio = 0.6;
-  const fontSize = Math.min(11, innerWidth / (label.length * charWidthRatio));
-
   return (
-    <g
-      style={{ cursor: "pointer" }}
-      onClick={() => onClick(node.commitId)}
-      role="button"
-      aria-label={`Commit ${node.commitId}`}
+    <button
+      type="button"
+      onClick={() => onClick(objectId)}
+      style={{
+        appearance: "none",
+        border: "none",
+        background: "transparent",
+        padding: 0,
+        width: "100%",
+        textAlign: "left",
+        cursor: "pointer",
+      }}
+      aria-label={objectId}
     >
-      <circle
-        cx={cx}
-        cy={cy}
-        r={NODE_RADIUS}
-        fill={COLORS.commit}
-        stroke={node.isHead ? COLORS.head : "#D97706"}
-        strokeWidth={node.isHead ? 3 : 2}
-      />
-      <text
-        x={cx}
-        y={cy}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={fontSize}
-        fontFamily="monospace"
-        fill={COLORS.text}
-        pointerEvents="none"
-      >
+      <NoteShell color={color} index={index} highlighted={highlighted}>
+        {children}
+      </NoteShell>
+    </button>
+  );
+}
+
+function NoteTitle({
+  label,
+  objectId,
+  accent,
+}: {
+  label: string;
+  objectId: ObjectId;
+  accent: string;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+      <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: accent }}>
         {label}
-      </text>
-    </g>
+      </span>
+      <span style={{ fontFamily: "monospace", fontSize: 15, fontWeight: 800 }}>
+        {formatObjectId(objectId)}
+      </span>
+    </div>
   );
 }
 
-function BranchLabel({ node }: { node: DAGNode }) {
-  if (node.branchNames.length === 0) return null;
-
-  const cx = node.x + PADDING;
-  const cy = node.y + PADDING;
-
+function BlobNote({ blob, index, onClick, highlighted }: {
+  blob: Blob;
+  index: number;
+  onClick: (id: ObjectId) => void;
+  highlighted: boolean;
+}) {
   return (
-    <>
-      {node.branchNames.map((name, i) => {
-        const labelX = cx + NODE_RADIUS + BRANCH_LABEL_OFFSET_X;
-        const labelY = cy - 8 + i * 20;
-        return (
-          <g key={name}>
-            <rect
-              x={labelX - 4}
-              y={labelY - 10}
-              width={name.length * 7.5 + 8}
-              height={18}
-              rx={4}
-              fill={COLORS.branch}
-              opacity={0.9}
-            />
-            <text
-              x={labelX}
-              y={labelY}
-              fontSize={11}
-              fontFamily="monospace"
-              fontWeight="bold"
-              fill="white"
-              dominantBaseline="middle"
+    <ClickableNote objectId={blob.id} color="#DCEEFF" index={index} highlighted={highlighted} onClick={onClick}>
+      <NoteTitle label="BLOB" objectId={blob.id} accent={COLORS.blob} />
+      <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 4 }}>中身</div>
+      <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "0.06em" }}>{blob.content}</div>
+    </ClickableNote>
+  );
+}
+
+function TreeNote({
+  tree,
+  index,
+  onClick,
+  highlighted,
+}: {
+  tree: Tree;
+  index: number;
+  onClick: (id: ObjectId) => void;
+  highlighted: boolean;
+}) {
+  return (
+    <ClickableNote objectId={tree.id} color="#DDF7EA" index={index} highlighted={highlighted} onClick={onClick}>
+      <NoteTitle label="TREE" objectId={tree.id} accent={COLORS.tree} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {tree.entries.length === 0 ? (
+          <div style={{ fontSize: 12, color: COLORS.muted }}>空の tree</div>
+        ) : (
+          tree.entries.map((entry) => (
+            <div
+              key={`${tree.id}-${entry.name}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                fontSize: 12,
+                borderTop: "1px dashed rgba(31,41,55,0.12)",
+                paddingTop: 6,
+              }}
             >
-              {name}
-            </text>
-          </g>
-        );
-      })}
-    </>
+              <span style={{ fontFamily: "monospace" }}>{entry.name}</span>
+              <span style={{ fontFamily: "monospace", fontWeight: 700 }}>
+                {formatObjectId(entry.objectId)}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </ClickableNote>
   );
 }
 
-function HeadIndicator({ node }: { node: DAGNode }) {
-  if (!node.isHead) return null;
-
-  const cx = node.x + PADDING;
-  const cy = node.y + PADDING;
-  const labelY = cy - NODE_RADIUS + HEAD_LABEL_OFFSET_Y;
-
+function CommitNote({
+  commit,
+  index,
+  onClick,
+  highlighted,
+  branchNames,
+  isHead,
+}: {
+  commit: Commit;
+  index: number;
+  onClick: (id: ObjectId) => void;
+  highlighted: boolean;
+  branchNames: string[];
+  isHead: boolean;
+}) {
   return (
-    <g>
-      <text
-        x={cx}
-        y={labelY}
-        textAnchor="middle"
-        fontSize={12}
-        fontFamily="monospace"
-        fontWeight="bold"
-        fill={COLORS.head}
-      >
-        HEAD
-      </text>
-      <line
-        x1={cx}
-        y1={labelY + 4}
-        x2={cx}
-        y2={cy - NODE_RADIUS}
-        stroke={COLORS.head}
-        strokeWidth={2}
-        markerEnd="url(#head-arrow)"
-      />
-    </g>
+    <ClickableNote objectId={commit.id} color="#FFF1C9" index={index} highlighted={highlighted} onClick={onClick}>
+      <NoteTitle label="COMMIT" objectId={commit.id} accent={COLORS.commit} />
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+        {isHead && (
+          <span style={{ background: COLORS.head, color: "white", fontSize: 10, fontWeight: 800, padding: "2px 6px", borderRadius: 999 }}>
+            HEAD
+          </span>
+        )}
+        {branchNames.map((name) => (
+          <span key={name} style={{ background: COLORS.branch, color: "white", fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 999 }}>
+            {name}
+          </span>
+        ))}
+      </div>
+      <div style={{ display: "grid", gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.muted }}>tree</div>
+          <div style={{ fontFamily: "monospace", fontWeight: 700 }}>{formatObjectId(commit.treeId)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.muted }}>parent</div>
+          <div style={{ fontFamily: "monospace", fontWeight: 700 }}>
+            {commit.parentIds.length === 0
+              ? "-"
+              : commit.parentIds.map((id) => formatObjectId(id)).join(", ")}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: COLORS.muted }}>msg</div>
+          <div style={{ fontSize: 12, fontWeight: 600 }}>{commit.message || "(no message)"}</div>
+        </div>
+      </div>
+    </ClickableNote>
   );
 }
 
-// =============================================================================
-// Main Component
-// =============================================================================
+function sortById<T extends { id: ObjectId }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const aMatch = a.id.match(/-(\d+)$/);
+    const bMatch = b.id.match(/-(\d+)$/);
+    if (aMatch && bMatch) return Number(aMatch[1]) - Number(bMatch[1]);
+    return a.id.localeCompare(b.id);
+  });
+}
 
 export function DAGGraphView() {
   const { state, dispatch } = useSimulator();
-  const layout: DAGLayout = calculateDAGLayout(state.objectStore, state.refStore);
-
-  const handleNodeClick = (objectId: ObjectId) => {
+  const handleClick = (objectId: ObjectId) => {
     dispatch({ type: "SELECT_OBJECT", objectId });
   };
+  const recentStep = state.stepHistory[state.stepHistory.length - 1] ?? null;
+  const recentObjects = new Set(recentStep?.objectsCreated ?? []);
+  const branches = state.refStore.getAllBranches();
+  const head = state.refStore.getHead();
+  const blobs = sortById(state.objectStore.getAllByType("blob") as Blob[]);
+  const trees = sortById(state.objectStore.getAllByType("tree") as Tree[]);
+  const commits = sortById(state.objectStore.getAllByType("commit") as Commit[]);
+  const branchMap = new Map<ObjectId, string[]>();
 
-  if (layout.nodes.length === 0) {
+  for (const [name, commitId] of branches) {
+    const names = branchMap.get(commitId) ?? [];
+    names.push(name);
+    branchMap.set(commitId, names);
+  }
+
+  if (blobs.length === 0 && trees.length === 0 && commits.length === 0) {
     return (
-      <div style={{ padding: 24, color: "#9CA3AF", textAlign: "center" }}>
-        No commits yet. Create a commit to see the DAG graph.
+      <div style={{ ...boardStyle, color: COLORS.muted }}>
+        <div
+          style={{
+            maxWidth: 540,
+            margin: "48px auto",
+            padding: 24,
+            border: `1px dashed ${COLORS.border}`,
+            borderRadius: 18,
+            background: "rgba(255,255,255,0.55)",
+            textAlign: "center",
+          }}
+        >
+          付箋はまだありません。左ペインの操作から Blob / Tree / Commit を追加すると、ここに盤面として並びます。
+        </div>
       </div>
     );
   }
 
-  // Build a lookup map for node positions
-  const nodeMap = new Map<ObjectId, DAGNode>();
-  for (const node of layout.nodes) {
-    nodeMap.set(node.commitId, node);
-  }
-
-  const svgWidth = layout.width + PADDING * 2 + NODE_SPACING_X;
-  const svgHeight = layout.height + PADDING * 2;
-
   return (
-    <svg
-      width="100%"
-      height="100%"
-      viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-      style={{ background: COLORS.bg, display: "block" }}
-    >
-      <defs>
-        <marker
-          id="arrowhead"
-          markerWidth={8}
-          markerHeight={6}
-          refX={8}
-          refY={3}
-          orient="auto"
-        >
-          <polygon points="0 0, 8 3, 0 6" fill={COLORS.edge} />
-        </marker>
-        <marker
-          id="head-arrow"
-          markerWidth={8}
-          markerHeight={6}
-          refX={4}
-          refY={3}
-          orient="auto"
-        >
-          <polygon points="0 0, 8 3, 0 6" fill={COLORS.head} />
-        </marker>
-      </defs>
-
-      {/* Edges */}
-      {layout.edges.map((edge) => {
-        const fromNode = nodeMap.get(edge.from);
-        const toNode = nodeMap.get(edge.to);
-        if (!fromNode || !toNode) return null;
-        return (
-          <EdgeLine
-            key={`${edge.from}-${edge.to}`}
-            fromNode={fromNode}
-            toNode={toNode}
-          />
-        );
-      })}
-
-      {/* Commit nodes */}
-      {layout.nodes.map((node) => (
-        <CommitNode key={node.commitId} node={node} onClick={handleNodeClick} />
-      ))}
-
-      {/* Branch labels */}
-      {layout.nodes.map((node) => (
-        <BranchLabel key={`branch-${node.commitId}`} node={node} />
-      ))}
-
-      {/* HEAD indicator */}
-      {layout.nodes.map((node) => (
-        <HeadIndicator key={`head-${node.commitId}`} node={node} />
-      ))}
-    </svg>
+    <div style={boardStyle}>
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", minWidth: "fit-content" }}>
+        <div style={columnStyle}>
+          <StickyHeader title="Blob 付箋" subtitle={`${blobs.length} 枚`} color={COLORS.blob} />
+          {blobs.map((blob, index) => (
+            <BlobNote
+              key={blob.id}
+              blob={blob}
+              index={index}
+              highlighted={recentObjects.has(blob.id)}
+              onClick={handleClick}
+            />
+          ))}
+        </div>
+        <div style={columnStyle}>
+          <StickyHeader title="Tree 付箋" subtitle={`${trees.length} 枚`} color={COLORS.tree} />
+          {trees.map((tree, index) => (
+            <TreeNote
+              key={tree.id}
+              tree={tree}
+              index={index}
+              highlighted={recentObjects.has(tree.id)}
+              onClick={handleClick}
+            />
+          ))}
+        </div>
+        <div style={columnStyle}>
+          <StickyHeader title="Commit 付箋" subtitle={`${commits.length} 枚`} color={COLORS.commit} />
+          {commits.map((commit, index) => {
+            const branchNames = branchMap.get(commit.id) ?? [];
+            const isHead = head.type === "detached"
+              ? head.commitId === commit.id
+              : branches.get(head.name) === commit.id;
+            return (
+              <CommitNote
+                key={commit.id}
+                commit={commit}
+                index={index}
+                highlighted={recentObjects.has(commit.id)}
+                onClick={handleClick}
+                branchNames={branchNames}
+                isHead={isHead}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }

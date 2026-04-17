@@ -4,7 +4,6 @@ import { CommandPanel } from "./ui/components/CommandPanel";
 import { DAGGraphView } from "./ui/components/DAGGraphView";
 import { DetailPanel } from "./ui/components/DetailPanel";
 import { ConflictResolver } from "./ui/components/ConflictResolver";
-import type { IdMode } from "./core/types";
 import "./App.css";
 
 // =============================================================================
@@ -22,15 +21,6 @@ const COLORS = {
   text: "#1F2937",
   muted: "#6B7280",
 } as const;
-
-// =============================================================================
-// ID Mode labels
-// =============================================================================
-
-const ID_MODE_OPTIONS: { value: IdMode; label: string }[] = [
-  { value: "sequential", label: "連番" },
-  { value: "pseudo-hash", label: "疑似ハッシュ" },
-];
 
 // =============================================================================
 // Header
@@ -57,7 +47,6 @@ function Header() {
         物理Gitシミュレータ
       </h1>
 
-      {/* ID Mode Selector + Notifications */}
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         {/* Error / Notification */}
         {state.errorMessage && (
@@ -111,54 +100,6 @@ function Header() {
           </span>
         )}
 
-        {/* ID Mode Radio Buttons */}
-        <fieldset
-          style={{
-            border: "none",
-            margin: 0,
-            padding: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <legend
-            style={{
-              fontSize: 11,
-              color: COLORS.muted,
-              fontWeight: 600,
-              padding: 0,
-              float: "left",
-              marginRight: 8,
-            }}
-          >
-            ID方式:
-          </legend>
-          {ID_MODE_OPTIONS.map((opt) => (
-            <label
-              key={opt.value}
-              style={{
-                fontSize: 12,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 3,
-                color: state.idMode === opt.value ? COLORS.text : COLORS.muted,
-                fontWeight: state.idMode === opt.value ? 600 : 400,
-              }}
-            >
-              <input
-                type="radio"
-                name="idMode"
-                value={opt.value}
-                checked={state.idMode === opt.value}
-                onChange={() => dispatch({ type: "SET_ID_MODE", mode: opt.value })}
-                style={{ margin: 0 }}
-              />
-              {opt.label}
-            </label>
-          ))}
-        </fieldset>
       </div>
     </header>
   );

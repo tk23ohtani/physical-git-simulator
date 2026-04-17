@@ -1,6 +1,7 @@
 import { useSimulator } from "../../state/use-simulator";
 import type { ObjectId, Blob, Tree, Commit, GitObject } from "../../core/types";
 import type { StepRecord } from "../../state/types";
+import { formatInlineIds, formatObjectId } from "../id-format";
 
 // =============================================================================
 // DetailPanel - 詳細表示パネル（右サイドバー）
@@ -72,7 +73,7 @@ function ClickableId({
         if (e.key === "Enter" || e.key === " ") onClick(objectId);
       }}
     >
-      {objectId}
+      {formatObjectId(objectId)}
     </span>
   );
 }
@@ -96,7 +97,7 @@ function BlobDetail({
       </div>
       <div style={{ marginBottom: 6 }}>
         <span style={labelStyle}>ID</span>
-        <div style={monoStyle}>{blob.id}</div>
+        <div style={monoStyle}>{formatObjectId(blob.id)}</div>
       </div>
       <div>
         <span style={labelStyle}>Content</span>
@@ -134,7 +135,7 @@ function TreeDetail({
       </div>
       <div style={{ marginBottom: 6 }}>
         <span style={labelStyle}>ID</span>
-        <div style={monoStyle}>{tree.id}</div>
+        <div style={monoStyle}>{formatObjectId(tree.id)}</div>
       </div>
       <div>
         <span style={labelStyle}>Entries ({tree.entries.length})</span>
@@ -199,7 +200,7 @@ function CommitDetail({
       </div>
       <div style={{ marginBottom: 6 }}>
         <span style={labelStyle}>ID</span>
-        <div style={monoStyle}>{commit.id}</div>
+        <div style={monoStyle}>{formatObjectId(commit.id)}</div>
       </div>
       <div style={{ marginBottom: 6 }}>
         <span style={labelStyle}>Message</span>
@@ -249,7 +250,7 @@ function ObjectDetail({
       <div style={sectionStyle}>
         <div style={sectionTitleStyle}>Object Detail</div>
         <div style={{ ...monoStyle, color: COLORS.muted }}>
-          Object not found: {objectId}
+          Object not found: {formatObjectId(objectId)}
         </div>
       </div>
     );
@@ -402,15 +403,15 @@ function StepHistory({ steps }: { steps: StepRecord[] }) {
               <div style={{ fontSize: 11, fontWeight: 600, color: actionColor }}>
                 {step.action}
               </div>
-              <div style={{ fontSize: 11, color: COLORS.text }}>{step.description}</div>
+              <div style={{ fontSize: 11, color: COLORS.text }}>{formatInlineIds(step.description)}</div>
               {step.objectsCreated.length > 0 && (
                 <div style={{ fontSize: 10, color: COLORS.muted }}>
-                  Created: {step.objectsCreated.join(", ")}
+                  Added: {step.objectsCreated.map((id) => formatObjectId(id)).join(", ")}
                 </div>
               )}
               {step.refsUpdated.length > 0 && (
                 <div style={{ fontSize: 10, color: COLORS.muted }}>
-                  Refs: {step.refsUpdated.join(", ")}
+                  Refs moved: {step.refsUpdated.map((ref) => formatInlineIds(ref)).join(", ")}
                 </div>
               )}
             </div>

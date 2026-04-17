@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useSimulator } from "../../state/use-simulator";
 import type { ObjectId, TreeEntry, GitObject, BlobWord1, BlobWord2, BlobContent } from "../../core/types";
 import { BLOB_WORD1, BLOB_WORD2 } from "../../core/types";
+import { formatObjectId } from "../id-format";
 
 // =============================================================================
 // CommandPanel - 操作パネル（左サイドバー）
@@ -168,9 +169,9 @@ function ContentMatrix({
                       color: blob ? COLORS.blob : COLORS.muted,
                       fontWeight: blob ? 600 : 400,
                     }}
-                    title={blob ? `ID: ${blob.id}` : content}
+                    title={blob ? `ID: ${formatObjectId(blob.id)}` : content}
                   >
-                    {blob ? blob.id : ""}
+                    {blob ? formatObjectId(blob.id) : ""}
                   </td>
                 );
               })}
@@ -238,7 +239,7 @@ function BlobCreator() {
           fontSize: 11,
           color: "#DC2626",
         }}>
-          この内容のBlobはすでに登録済みです（ID: {existingBlob.id}）
+          この内容のBlobはすでに登録済みです（ID: {formatObjectId(existingBlob.id)}）
         </div>
       )}
 
@@ -320,7 +321,7 @@ function TreeCreator() {
             <option value="">-- 参照先 --</option>
             {availableObjects.map((obj) => (
               <option key={obj.id} value={obj.id}>
-                {obj.type}:{obj.id.slice(0, 10)}
+                {obj.type}:{formatObjectId(obj.id)}
               </option>
             ))}
           </select>
@@ -382,12 +383,12 @@ function CommitCreator() {
     <Section title="Commit 作成" color={COLORS.commit}>
       <label style={labelStyle}>Tree ID</label>
       <select style={inputStyle} value={treeId} onChange={(e) => setTreeId(e.target.value)}>
-        <option value="">-- Tree を選択 --</option>
-        {trees.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.id}
-          </option>
-        ))}
+          <option value="">-- Tree を選択 --</option>
+          {trees.map((t) => (
+            <option key={t.id} value={t.id}>
+              {formatObjectId(t.id)}
+            </option>
+          ))}
       </select>
 
       <div style={fieldGap}>
@@ -404,7 +405,7 @@ function CommitCreator() {
           <option value="">-- 親 Commit を追加 --</option>
           {commits.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.id}
+              {formatObjectId(c.id)}
             </option>
           ))}
         </select>
@@ -412,7 +413,7 @@ function CommitCreator() {
           style={{ ...inputStyle, marginTop: 4 }}
           value={parentIdsStr}
           onChange={(e) => setParentIdsStr(e.target.value)}
-          placeholder="例: commit-1, commit-2"
+          placeholder="例: C1, C2"
         />
       </div>
 
@@ -571,7 +572,7 @@ function BranchManager() {
         <select style={inputStyle} value={commitId} onChange={(e) => setCommitId(e.target.value)}>
           <option value="">-- Commit を選択 --</option>
           {commits.map((c) => (
-            <option key={c.id} value={c.id}>{c.id}</option>
+            <option key={c.id} value={c.id}>{formatObjectId(c.id)}</option>
           ))}
         </select>
       </div>
@@ -599,7 +600,7 @@ function BranchManager() {
         <select style={inputStyle} value={moveCommitId} onChange={(e) => setMoveCommitId(e.target.value)}>
           <option value="">-- Commit を選択 --</option>
           {commits.map((c) => (
-            <option key={c.id} value={c.id}>{c.id}</option>
+            <option key={c.id} value={c.id}>{formatObjectId(c.id)}</option>
           ))}
         </select>
       </div>
@@ -644,7 +645,7 @@ function CheckoutPanel() {
   return (
     <Section title="Checkout" color={COLORS.head}>
       <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 6 }}>
-        HEAD: {head.type === "branch" ? `🔗 ${head.name}` : `⚠️ Detached (${head.commitId})`}
+        HEAD: {head.type === "branch" ? `🔗 ${head.name}` : `⚠️ Detached (${formatObjectId(head.commitId)})`}
       </div>
 
       <label style={labelStyle}>Branch Checkout</label>
@@ -679,7 +680,7 @@ function CheckoutPanel() {
         >
           <option value="">-- Commit --</option>
           {commits.map((c) => (
-            <option key={c.id} value={c.id}>{c.id}</option>
+            <option key={c.id} value={c.id}>{formatObjectId(c.id)}</option>
           ))}
         </select>
         <button

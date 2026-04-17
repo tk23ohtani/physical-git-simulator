@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useSimulator } from "../../state/use-simulator";
 import type { ConflictEntry, ResolveChoice, BlobContent, BlobWord1, BlobWord2 } from "../../core/types";
 import { BLOB_WORD1, BLOB_WORD2 } from "../../core/types";
+import { formatObjectId } from "../id-format";
 
 // =============================================================================
 // ConflictResolver - Conflict解決UI（2ワード構造対応）
@@ -157,9 +158,9 @@ function ContentMatrixPicker({
                       fontWeight: blob ? 600 : 400,
                       transition: "background 0.1s",
                     }}
-                    title={blob ? `ID: ${blob.id}` : `${content}（新規作成）`}
+                    title={blob ? `ID: ${formatObjectId(blob.id)}` : `${content}（新規作成）`}
                   >
-                    {blob ? blob.id : content}
+                    {blob ? formatObjectId(blob.id) : content}
                   </td>
                 );
               })}
