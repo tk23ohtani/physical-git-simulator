@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { useSimulator } from "../../state/context";
 
 const COLORS = {
@@ -9,20 +10,36 @@ const COLORS = {
 } as const;
 
 function getActionColor(action: string): string {
-  if (action.includes("BLOB")) return "#3B82F6";
-  if (action.includes("TREE")) return "#10B981";
-  if (action.includes("COMMIT")) return "#F59E0B";
-  if (action.includes("BRANCH")) return "#8B5CF6";
-  if (action.includes("CHECKOUT")) return "#EF4444";
-  if (action.includes("MERGE") || action.includes("CONFLICT")) return "#7C3AED";
-  return COLORS.muted;
+  switch (action) {
+    case "CREATE_BLOB":
+      return "#3B82F6";
+    case "CREATE_TREE":
+      return "#10B981";
+    case "CREATE_COMMIT":
+    case "HIGH_LEVEL_COMMIT":
+    case "FIX_COMMIT":
+      return "#F59E0B";
+    case "CREATE_BRANCH":
+    case "MOVE_BRANCH":
+      return "#8B5CF6";
+    case "CHECKOUT_BRANCH":
+    case "CHECKOUT_COMMIT":
+      return "#EF4444";
+    case "START_MERGE":
+    case "RESOLVE_CONFLICT":
+    case "COMPLETE_MERGE":
+      return "#7C3AED";
+    default:
+      return COLORS.muted;
+  }
 }
 
 export function StickyNotesView() {
   const { state } = useSimulator();
-  const notes = [...state.stepHistory].reverse();
+  const steps = state.stepHistory;
+  const stepCount = steps.length;
 
-  if (notes.length === 0) {
+  if (stepCount === 0) {
     return (
       <div
         style={{
@@ -42,6 +59,46 @@ export function StickyNotesView() {
     );
   }
 
+  const noteCards: ReactElement[] = [];
+  for (let stepIndex = stepCount - 1; stepIndex >= 0; stepIndex--) {
+    const step = steps[stepIndex];
+    const accent = getActionColor(step.action);
+    const stickyColor = COLORS.sticky[stepIndex % COLORS.sticky.length];
+    noteCards.push(
+      <article
+        key={`step-${stepIndex}`}
+        style={{
+          background: stickyColor,
+          border: `1px solid ${COLORS.border}`,
+          borderTop: `4px solid ${accent}`,
+          borderRadius: 8,
+          padding: 10,
+          boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+          minHeight: 120,
+        }}
+      >
+        <div style={{ fontSize: 10, color: COLORS.muted, fontWeight: 700 }}>
+          Step {stepIndex + 1}
+        </div>
+        <div style={{ fontSize: 12, color: accent, fontWeight: 700 }}>{step.action}</div>
+        <div style={{ fontSize: 12, color: COLORS.text }}>{step.description}</div>
+        {step.objectsCreated.length > 0 && (
+          <div style={{ fontSize: 11, color: COLORS.muted }}>
+            Created: {step.objectsCreated.join(", ")}
+          </div>
+        )}
+        {step.refsUpdated.length > 0 && (
+          <div style={{ fontSize: 11, color: COLORS.muted }}>
+            Refs: {step.refsUpdated.join(", ")}
+          </div>
+        )}
+      </article>,
+    );
+  }
+
   return (
     <div
       style={{
@@ -54,43 +111,7 @@ export function StickyNotesView() {
         alignContent: "start",
       }}
     >
-      {notes.map((step, index) => {
-        const accent = getActionColor(step.action);
-        const stickyColor = COLORS.sticky[index % COLORS.sticky.length];
-        return (
-          <article
-            key={`${step.action}-${index}`}
-            style={{
-              background: stickyColor,
-              border: `1px solid ${COLORS.border}`,
-              borderTop: `4px solid ${accent}`,
-              borderRadius: 8,
-              padding: 10,
-              boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
-              minHeight: 120,
-            }}
-          >
-            <div style={{ fontSize: 10, color: COLORS.muted, fontWeight: 700 }}>
-              Step {notes.length - index}
-            </div>
-            <div style={{ fontSize: 12, color: accent, fontWeight: 700 }}>{step.action}</div>
-            <div style={{ fontSize: 12, color: COLORS.text }}>{step.description}</div>
-            {step.objectsCreated.length > 0 && (
-              <div style={{ fontSize: 11, color: COLORS.muted }}>
-                Created: {step.objectsCreated.join(", ")}
-              </div>
-            )}
-            {step.refsUpdated.length > 0 && (
-              <div style={{ fontSize: 11, color: COLORS.muted }}>
-                Refs: {step.refsUpdated.join(", ")}
-              </div>
-            )}
-          </article>
-        );
-      })}
+      {noteCards}
     </div>
   );
 }
