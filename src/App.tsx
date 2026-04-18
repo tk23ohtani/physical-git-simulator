@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { SimulatorProvider, useSimulator } from "./state/context";
 import { CommandPanel } from "./ui/components/CommandPanel";
 import { DAGGraphView } from "./ui/components/DAGGraphView";
 import { DetailPanel } from "./ui/components/DetailPanel";
 import { ConflictResolver } from "./ui/components/ConflictResolver";
+import { StickyNotesView } from "./ui/components/StickyNotesView";
 import type { IdMode } from "./core/types";
 import "./App.css";
 
@@ -212,6 +214,8 @@ function Legend() {
 // =============================================================================
 
 function MainLayout() {
+  const [centerPaneView, setCenterPaneView] = useState<"sticky" | "dag">("sticky");
+
   return (
     <div
       style={{
@@ -225,16 +229,67 @@ function MainLayout() {
         <CommandPanel />
       </div>
 
-      {/* Center: DAGGraphView flexible */}
+      {/* Center: Sticky / DAG toggle */}
       <div
         style={{
           flex: 1,
-          overflow: "auto",
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
           borderLeft: `1px solid ${COLORS.border}`,
           borderRight: `1px solid ${COLORS.border}`,
         }}
       >
-        <DAGGraphView />
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "6px 10px",
+            borderBottom: `1px solid ${COLORS.border}`,
+            background: "#fff",
+            flexShrink: 0,
+          }}
+        >
+          <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.muted }}>中央ペイン表示</span>
+          <div style={{ display: "inline-flex", gap: 4 }}>
+            <button
+              type="button"
+              onClick={() => setCenterPaneView("sticky")}
+              style={{
+                border: `1px solid ${centerPaneView === "sticky" ? "#F59E0B" : COLORS.border}`,
+                background: centerPaneView === "sticky" ? "#FEF3C7" : "#fff",
+                color: centerPaneView === "sticky" ? COLORS.text : COLORS.muted,
+                borderRadius: 6,
+                padding: "4px 8px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              付箋表示
+            </button>
+            <button
+              type="button"
+              onClick={() => setCenterPaneView("dag")}
+              style={{
+                border: `1px solid ${centerPaneView === "dag" ? "#F59E0B" : COLORS.border}`,
+                background: centerPaneView === "dag" ? "#FEF3C7" : "#fff",
+                color: centerPaneView === "dag" ? COLORS.text : COLORS.muted,
+                borderRadius: 6,
+                padding: "4px 8px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              DAG表示
+            </button>
+          </div>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+          {centerPaneView === "sticky" ? <StickyNotesView /> : <DAGGraphView />}
+        </div>
       </div>
 
       {/* Right: DetailPanel ~300px */}
