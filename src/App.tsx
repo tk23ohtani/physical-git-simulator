@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { SimulatorProvider } from "./state/context";
 import { useSimulator } from "./state/use-simulator";
 import { CommandPanel } from "./ui/components/CommandPanel";
 import { DAGGraphView } from "./ui/components/DAGGraphView";
+import { CommitDAGView } from "./ui/components/CommitDAGView";
 import { DetailPanel } from "./ui/components/DetailPanel";
 import { ConflictResolver } from "./ui/components/ConflictResolver";
 import "./App.css";
@@ -21,6 +23,8 @@ const COLORS = {
   text: "#1F2937",
   muted: "#6B7280",
 } as const;
+
+type CenterViewMode = "board" | "dag";
 
 // =============================================================================
 // Header
@@ -153,7 +157,66 @@ function Legend() {
 // MainLayout - 3-column layout
 // =============================================================================
 
+function ViewModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: CenterViewMode;
+  onChange: (mode: CenterViewMode) => void;
+}) {
+  const baseButtonStyle: React.CSSProperties = {
+    appearance: "none",
+    border: "none",
+    background: "transparent",
+    borderRadius: 999,
+    padding: "6px 12px",
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+  };
+
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: 4,
+        borderRadius: 999,
+        background: "#fff",
+        border: `1px solid ${COLORS.border}`,
+        boxShadow: "0 4px 10px rgba(31,41,55,0.06)",
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => onChange("board")}
+        style={{
+          ...baseButtonStyle,
+          background: mode === "board" ? "#FDE68A" : "transparent",
+          color: mode === "board" ? COLORS.text : COLORS.muted,
+        }}
+      >
+        付箋
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("dag")}
+        style={{
+          ...baseButtonStyle,
+          background: mode === "dag" ? "#FDE68A" : "transparent",
+          color: mode === "dag" ? COLORS.text : COLORS.muted,
+        }}
+      >
+        DAG
+      </button>
+    </div>
+  );
+}
+
 function MainLayout() {
+  const [centerViewMode, setCenterViewMode] = useState<CenterViewMode>("board");
+
   return (
     <div
       style={{
@@ -167,7 +230,7 @@ function MainLayout() {
         <CommandPanel />
       </div>
 
-      {/* Center: DAGGraphView flexible */}
+      {/* Center: board / DAG view */}
       <div
         style={{
           flex: 1,
@@ -176,7 +239,32 @@ function MainLayout() {
           borderRight: `1px solid ${COLORS.border}`,
         }}
       >
-        <DAGGraphView />
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            padding: "12px 16px",
+            background: "rgba(249,250,251,0.92)",
+            borderBottom: `1px solid ${COLORS.border}`,
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text }}>
+              中央ビュー
+            </div>
+            <div style={{ fontSize: 11, color: COLORS.muted }}>
+              デフォルトは付箋表示。必要なときだけ DAG に切り替えられます。
+            </div>
+          </div>
+          <ViewModeToggle mode={centerViewMode} onChange={setCenterViewMode} />
+        </div>
+        {centerViewMode === "board" ? <DAGGraphView /> : <CommitDAGView />}
       </div>
 
       {/* Right: DetailPanel ~300px */}
