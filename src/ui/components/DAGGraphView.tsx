@@ -42,11 +42,6 @@ const noteBaseStyle: React.CSSProperties = {
   color: COLORS.text,
 };
 
-function getRotation(index: number): string {
-  const rotations = ["rotate(-1deg)", "rotate(0.6deg)", "rotate(-0.4deg)", "rotate(1deg)"];
-  return rotations[index % rotations.length];
-}
-
 function pinStyle(color: string): React.CSSProperties {
   return {
     width: 14,
@@ -62,12 +57,10 @@ function pinStyle(color: string): React.CSSProperties {
 
 function NoteShell({
   color,
-  index,
   highlighted = false,
   children,
 }: {
   color: string;
-  index: number;
   highlighted?: boolean;
   children: React.ReactNode;
 }) {
@@ -77,7 +70,6 @@ function NoteShell({
         ...noteBaseStyle,
         position: "relative",
         background: `linear-gradient(180deg, ${color}, rgba(255,255,255,0.45))`,
-        transform: getRotation(index),
         outline: highlighted ? `3px solid ${COLORS.head}` : "none",
         outlineOffset: 2,
       }}
@@ -119,14 +111,12 @@ function StickyHeader({
 function ClickableNote({
   objectId,
   color,
-  index,
   highlighted,
   children,
   onClick,
 }: {
   objectId: ObjectId;
   color: string;
-  index: number;
   highlighted?: boolean;
   children: React.ReactNode;
   onClick: (id: ObjectId) => void;
@@ -146,7 +136,7 @@ function ClickableNote({
       }}
       aria-label={objectId}
     >
-      <NoteShell color={color} index={index} highlighted={highlighted}>
+      <NoteShell color={color} highlighted={highlighted}>
         {children}
       </NoteShell>
     </button>
@@ -174,14 +164,13 @@ function NoteTitle({
   );
 }
 
-function BlobNote({ blob, index, onClick, highlighted }: {
+function BlobNote({ blob, onClick, highlighted }: {
   blob: Blob;
-  index: number;
   onClick: (id: ObjectId) => void;
   highlighted: boolean;
 }) {
   return (
-    <ClickableNote objectId={blob.id} color="#DCEEFF" index={index} highlighted={highlighted} onClick={onClick}>
+    <ClickableNote objectId={blob.id} color="#DCEEFF" highlighted={highlighted} onClick={onClick}>
       <NoteTitle label="BLOB" objectId={blob.id} accent={COLORS.blob} />
       <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 4 }}>中身</div>
       <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "0.06em" }}>{blob.content}</div>
@@ -191,17 +180,15 @@ function BlobNote({ blob, index, onClick, highlighted }: {
 
 function TreeNote({
   tree,
-  index,
   onClick,
   highlighted,
 }: {
   tree: Tree;
-  index: number;
   onClick: (id: ObjectId) => void;
   highlighted: boolean;
 }) {
   return (
-    <ClickableNote objectId={tree.id} color="#DDF7EA" index={index} highlighted={highlighted} onClick={onClick}>
+    <ClickableNote objectId={tree.id} color="#DDF7EA" highlighted={highlighted} onClick={onClick}>
       <NoteTitle label="TREE" objectId={tree.id} accent={COLORS.tree} />
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {tree.entries.length === 0 ? (
@@ -234,21 +221,19 @@ function TreeNote({
 
 function CommitNote({
   commit,
-  index,
   onClick,
   highlighted,
   branchNames,
   isHead,
 }: {
   commit: Commit;
-  index: number;
   onClick: (id: ObjectId) => void;
   highlighted: boolean;
   branchNames: string[];
   isHead: boolean;
 }) {
   return (
-    <ClickableNote objectId={commit.id} color="#FFF1C9" index={index} highlighted={highlighted} onClick={onClick}>
+    <ClickableNote objectId={commit.id} color="#FFF1C9" highlighted={highlighted} onClick={onClick}>
       <NoteTitle label="COMMIT" objectId={commit.id} accent={COLORS.commit} />
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
         {isHead && (
@@ -338,11 +323,10 @@ export function DAGGraphView() {
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start", minWidth: "fit-content" }}>
         <div style={columnStyle}>
           <StickyHeader title="Blob 付箋" subtitle={`${blobs.length} 枚`} color={COLORS.blob} />
-          {blobs.map((blob, index) => (
+          {blobs.map((blob) => (
             <BlobNote
               key={blob.id}
               blob={blob}
-              index={index}
               highlighted={recentObjects.has(blob.id)}
               onClick={handleClick}
             />
@@ -350,11 +334,10 @@ export function DAGGraphView() {
         </div>
         <div style={columnStyle}>
           <StickyHeader title="Tree 付箋" subtitle={`${trees.length} 枚`} color={COLORS.tree} />
-          {trees.map((tree, index) => (
+          {trees.map((tree) => (
             <TreeNote
               key={tree.id}
               tree={tree}
-              index={index}
               highlighted={recentObjects.has(tree.id)}
               onClick={handleClick}
             />
@@ -362,7 +345,7 @@ export function DAGGraphView() {
         </div>
         <div style={columnStyle}>
           <StickyHeader title="Commit 付箋" subtitle={`${commits.length} 枚`} color={COLORS.commit} />
-          {commits.map((commit, index) => {
+          {commits.map((commit) => {
             const branchNames = branchMap.get(commit.id) ?? [];
             const isHead = head.type === "detached"
               ? head.commitId === commit.id
@@ -371,7 +354,6 @@ export function DAGGraphView() {
               <CommitNote
                 key={commit.id}
                 commit={commit}
-                index={index}
                 highlighted={recentObjects.has(commit.id)}
                 onClick={handleClick}
                 branchNames={branchNames}
