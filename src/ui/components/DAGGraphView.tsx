@@ -11,6 +11,7 @@ const COLORS = {
   tree: "#10B981",
   commit: "#F59E0B",
   branch: "#8B5CF6",
+  remoteBranch: "#0EA5E9",  // sky-500: リモートブランチ
   head: "#EF4444",
   text: "#1F2937",
   bg: "#F6F1E8",
@@ -224,12 +225,14 @@ function CommitNote({
   onClick,
   highlighted,
   branchNames,
+  remoteBranchNames,
   isHead,
 }: {
   commit: Commit;
   onClick: (id: ObjectId) => void;
   highlighted: boolean;
   branchNames: string[];
+  remoteBranchNames: string[];  // "origin/main" など
   isHead: boolean;
 }) {
   return (
@@ -244,6 +247,23 @@ function CommitNote({
         {branchNames.map((name) => (
           <span key={name} style={{ background: COLORS.branch, color: "white", fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 999 }}>
             {name}
+          </span>
+        ))}
+        {remoteBranchNames.map((name) => (
+          <span
+            key={name}
+            style={{
+              background: COLORS.remoteBranch,
+              color: "white",
+              fontSize: 10,
+              fontWeight: 700,
+              padding: "2px 6px",
+              borderRadius: 999,
+              opacity: 0.9,
+            }}
+            title="リモートブランチ"
+          >
+            🌐 {name}
           </span>
         ))}
       </div>
@@ -290,12 +310,25 @@ export function DAGGraphView() {
   const blobs = sortById(state.objectStore.getAllByType("blob") as Blob[]);
   const trees = sortById(state.objectStore.getAllByType("tree") as Tree[]);
   const commits = sortById(state.objectStore.getAllByType("commit") as Commit[]);
-  const branchMap = new Map<ObjectId, string[]>();
 
+  // ローカルブランチ: commitId → ブランチ名リスト（origin/xxx は除外）
+  const branchMap = new Map<ObjectId, string[]>();
   for (const [name, commitId] of branches) {
+    if (name.includes("/")) continue; // トラッキングブランチはリモートマップへ
     const names = branchMap.get(commitId) ?? [];
     names.push(name);
     branchMap.set(commitId, names);
+  }
+
+  // リモートブランチ: commitId → "origin/xxx" 名リスト
+  // RemoteStore から直接読み取る
+  const remoteBranchMap = new Map<ObjectId, string[]>();
+  for (const remoteName of state.remoteStore.getRemoteNames()) {
+    for (const [branchName, commitId] of state.remoteStore.getAllRemoteBranches(remoteName)) {
+      const names = remoteBranchMap.get(commitId) ?? [];
+      names.push(`${remoteName}/${branchName}`);
+      remoteBranchMap.set(commitId, names);
+    }
   }
 
   if (blobs.length === 0 && trees.length === 0 && commits.length === 0) {
@@ -347,6 +380,7 @@ export function DAGGraphView() {
           <StickyHeader title="Commit 付箋" subtitle={`${commits.length} 枚`} color={COLORS.commit} />
           {commits.map((commit) => {
             const branchNames = branchMap.get(commit.id) ?? [];
+            const remoteBranchNames = remoteBranchMap.get(commit.id) ?? [];
             const isHead = head.type === "detached"
               ? head.commitId === commit.id
               : branches.get(head.name) === commit.id;
@@ -357,6 +391,7 @@ export function DAGGraphView() {
                 highlighted={recentObjects.has(commit.id)}
                 onClick={handleClick}
                 branchNames={branchNames}
+                remoteBranchNames={remoteBranchNames}
                 isHead={isHead}
               />
             );

@@ -7,6 +7,7 @@ import type {
 } from "../core/types";
 import type { ObjectStore } from "../core/object-store";
 import type { RefStore } from "../core/ref-store";
+import type { RemoteStore } from "../core/remote-store";
 
 // =============================================================================
 // State Management 型定義 - 物理Gitシミュレータ
@@ -38,6 +39,7 @@ export interface StepRecord {
 export interface SimulatorState {
   objectStore: ObjectStore;
   refStore: RefStore;
+  remoteStore: RemoteStore;
   idMode: IdMode;
   selectedObjectId: ObjectId | null;
   mergeState: MergeState | null;
@@ -64,4 +66,9 @@ export type SimulatorAction =
   | { type: "FIX_COMMIT"; files: { name: string; content: string }[]; message: string }
   | { type: "SET_ID_MODE"; mode: IdMode }
   | { type: "SELECT_OBJECT"; objectId: ObjectId | null }
-  | { type: "DISMISS_MESSAGE" };
+  | { type: "DISMISS_MESSAGE" }
+  // --- Remote operations ---
+  | { type: "PUSH"; remoteName: string; branchName: string }
+  | { type: "FORCE_PUSH"; remoteName: string; branchName: string }
+  | { type: "FETCH"; remoteName: string }
+  | { type: "PULL"; remoteName: string; branchName: string };

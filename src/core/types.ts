@@ -82,3 +82,22 @@ export interface ConflictEntry {
 }
 
 export type ResolveChoice = "ours" | "theirs" | { manual: string };
+
+// =============================================================================
+// Remote
+// =============================================================================
+
+/** リモートへの push 結果 */
+export type PushResultType =
+  | "ok"                    // fast-forward push 成功
+  | "rejected-non-ff"       // non-fast-forward のため拒否（--force が必要）
+  | "force-pushed"          // --force による強制 push 成功
+  | "up-to-date";           // すでに同じコミットを指しているため何もしなかった
+
+export interface PushResult {
+  type: PushResultType;
+  branchName: string;
+  remoteName: string;
+  previousCommitId: ObjectId | null; // force-push 前のリモート先端（null=ブランチ未存在）
+  newCommitId: ObjectId;
+}

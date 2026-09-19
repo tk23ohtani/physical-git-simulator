@@ -2,6 +2,7 @@ import type { SimulatorState } from "./types";
 import type { PersistedState } from "../core/persistence";
 import { ObjectStore } from "../core/object-store";
 import { RefStore } from "../core/ref-store";
+import { RemoteStore } from "../core/remote-store";
 import { IDGenerator } from "../core/id-generator";
 import type { GitObject } from "../core/types";
 
@@ -18,12 +19,22 @@ export function serializeState(state: SimulatorState): PersistedState {
     branches.push({ name, commitId });
   }
 
+  const remotes: PersistedState["remotes"] = [];
+  for (const remoteName of state.remoteStore.getRemoteNames()) {
+    const remoteBranches: Array<{ name: string; commitId: string }> = [];
+    for (const [branchName, commitId] of state.remoteStore.getAllRemoteBranches(remoteName)) {
+      remoteBranches.push({ name: branchName, commitId });
+    }
+    remotes.push({ name: remoteName, branches: remoteBranches });
+  }
+
   return {
     version: 1,
     objects,
     branches,
     head: state.refStore.getHead(),
     idMode: state.idMode,
+    remotes,
   };
 }
 
@@ -33,6 +44,7 @@ export function deserializeState(persisted: PersistedState): SimulatorState {
 
   const objectStore = new ObjectStore(idGenerator);
   const refStore = new RefStore(objectStore);
+  const remoteStore = new RemoteStore(objectStore);
 
   const byType: Record<string, typeof persisted.objects> = {
     blob: [],
@@ -65,9 +77,23 @@ export function deserializeState(persisted: PersistedState): SimulatorState {
     refStore.checkoutCommit(persisted.head.commitId);
   }
 
+  // リモートの復元
+  if (persisted.remotes && persisted.remotes.length > 0) {
+    for (const remote of persisted.remotes) {
+      remoteStore.addRemote(remote.name);
+      for (const branch of remote.branches) {
+        remoteStore.forcePush(remote.name, branch.name, branch.commitId);
+      }
+    }
+  } else {
+    // 旧データには remotes がない: デフォルトの origin を追加
+    remoteStore.addRemote("origin");
+  }
+
   return {
     objectStore,
     refStore,
+    remoteStore,
     idMode: persisted.idMode,
     selectedObjectId: null,
     mergeState: null,

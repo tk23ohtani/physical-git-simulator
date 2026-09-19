@@ -23,6 +23,10 @@ export interface PersistedState {
   branches: Array<{ name: string; commitId: ObjectId }>;
   head: HeadRef;
   idMode: IdMode;
+  remotes?: Array<{
+    name: string;
+    branches: Array<{ name: string; commitId: ObjectId }>;
+  }>;
 }
 
 // --- localStorage キー ---

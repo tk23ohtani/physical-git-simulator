@@ -6,6 +6,7 @@ import type {
 } from "./types";
 import { ObjectStore } from "../core/object-store";
 import { RefStore } from "../core/ref-store";
+import { RemoteStore } from "../core/remote-store";
 import { IDGenerator } from "../core/id-generator";
 import { MergeEngine } from "../core/merge-engine";
 
@@ -16,9 +17,12 @@ export function createInitialState(): SimulatorState {
   const idGenerator = new IDGenerator();
   const objectStore = new ObjectStore(idGenerator);
   const refStore = new RefStore(objectStore);
+  const remoteStore = new RemoteStore(objectStore);
+  remoteStore.addRemote("origin");
   return {
     objectStore,
     refStore,
+    remoteStore,
     idMode: idGenerator.getMode(),
     selectedObjectId: null,
     mergeState: null,
@@ -35,10 +39,12 @@ export function createInitialState(): SimulatorState {
 function cloneState(state: SimulatorState): SimulatorState {
   const objectStore = state.objectStore.clone();
   const refStore = state.refStore.clone(objectStore);
+  const remoteStore = state.remoteStore.clone(objectStore);
   return {
     ...state,
     objectStore,
     refStore,
+    remoteStore,
     errorMessage: null,
     notification: null,
   };
@@ -104,6 +110,18 @@ export function simulatorReducer(
 
       case "DISMISS_MESSAGE":
         return { ...state, errorMessage: null, notification: null };
+
+      case "PUSH":
+        return handlePush(next, action.remoteName, action.branchName, false);
+
+      case "FORCE_PUSH":
+        return handlePush(next, action.remoteName, action.branchName, true);
+
+      case "FETCH":
+        return handleFetch(next, action.remoteName);
+
+      case "PULL":
+        return handlePull(next, action.remoteName, action.branchName);
 
       default:
         return next;
@@ -493,6 +511,203 @@ function handleSelectObject(
 ): SimulatorState {
   state.selectedObjectId = objectId;
   // SELECT_OBJECT does not add a step record (UI-only action)
+  return state;
+}
+
+// =============================================================================
+// Remote Action Handlers
+// =============================================================================
+
+/**
+ * handlePush / handleForcePush
+ *
+ * push (force=false):
+ *   - ローカルブランチの先端がリモート先端の子孫なら fast-forward push OK
+ *   - 非 fast-forward なら rejected → エラーメッセージ表示
+ *
+ * push --force (force=true):
+ *   - チェックなしで強制上書き
+ *   - 上書き前後のコミット ID を通知で表示
+ */
+function handlePush(
+  state: SimulatorState,
+  remoteName: string,
+  branchName: string,
+  force: boolean
+): SimulatorState {
+  const localCommitId = state.refStore.getBranch(branchName);
+  if (!localCommitId) {
+    throw new Error(`ローカルブランチ "${branchName}" が存在しません`);
+  }
+
+  if (force) {
+    const previousId = state.remoteStore.forcePush(remoteName, branchName, localCommitId);
+    const prevLabel = previousId ? previousId.slice(0, 6) : "(新規)";
+    state.notification = `⚡ force push 完了: ${remoteName}/${branchName} ${prevLabel} → ${localCommitId.slice(0, 6)}${previousId ? " ⚠ リモートの履歴を上書きしました" : ""}`;
+
+    addStep(state, {
+      action: "FORCE_PUSH",
+      description: `force push: ${branchName} → ${remoteName}/${branchName}${previousId ? ` (上書き前: ${previousId.slice(0, 6)})` : " (新規)"}`,
+      objectsCreated: [],
+      refsUpdated: [`${remoteName}/${branchName}`],
+    });
+  } else {
+    const result = state.remoteStore.push(remoteName, branchName, localCommitId);
+
+    switch (result) {
+      case "ok":
+        state.notification = `push 完了: ${branchName} → ${remoteName}/${branchName}`;
+        addStep(state, {
+          action: "PUSH",
+          description: `push: ${branchName} → ${remoteName}/${branchName} (${localCommitId.slice(0, 6)})`,
+          objectsCreated: [],
+          refsUpdated: [`${remoteName}/${branchName}`],
+        });
+        break;
+
+      case "up-to-date":
+        state.notification = `Already up-to-date: ${remoteName}/${branchName} はすでに最新です`;
+        break;
+
+      case "rejected-non-ff":
+        throw new Error(
+          `push が拒否されました: ${remoteName}/${branchName} はローカルより進んでいます（non-fast-forward）。\n` +
+          `先に fetch & merge して最新を取り込むか、強制的に上書きするには push --force を使ってください。`
+        );
+    }
+  }
+
+  return state;
+}
+
+/**
+ * handleFetch
+ *
+ * リモートのスナップショットをローカルの RefStore に
+ * トラッキングブランチ（origin/xxx）として反映する。
+ *
+ * 実装として: RemoteStore のスナップショットを読んで
+ * RefStore に "origin/xxx" ブランチとして作成 or 移動する。
+ */
+function handleFetch(
+  state: SimulatorState,
+  remoteName: string
+): SimulatorState {
+  const snapshot = state.remoteStore.fetchSnapshot(remoteName);
+  if (snapshot.size === 0) {
+    state.notification = `${remoteName} にブランチがありません（push してからfetchしてください）`;
+    return state;
+  }
+
+  const updated: string[] = [];
+
+  for (const [branchName, commitId] of snapshot) {
+    const trackingName = `${remoteName}/${branchName}`;
+    const existing = state.refStore.getBranch(trackingName);
+    if (existing === undefined) {
+      state.refStore.createBranch(trackingName, commitId);
+    } else if (existing !== commitId) {
+      state.refStore.moveBranch(trackingName, commitId);
+    }
+    updated.push(trackingName);
+  }
+
+  state.notification = `fetch 完了: ${updated.join(", ")} を更新しました`;
+
+  addStep(state, {
+    action: "FETCH",
+    description: `fetch ${remoteName}: ${updated.join(", ")}`,
+    objectsCreated: [],
+    refsUpdated: updated,
+  });
+
+  return state;
+}
+
+/**
+ * handlePull
+ *
+ * fetch + merge を実行する。
+ * 1. fetch でトラッキングブランチを更新
+ * 2. 現在 HEAD が branchName を指していることを確認
+ * 3. origin/branchName を現在のブランチにマージ
+ */
+function handlePull(
+  state: SimulatorState,
+  remoteName: string,
+  branchName: string
+): SimulatorState {
+  // Step 1: fetch
+  state = handleFetch(state, remoteName);
+
+  const trackingBranch = `${remoteName}/${branchName}`;
+  const trackingCommitId = state.refStore.getBranch(trackingBranch);
+  if (!trackingCommitId) {
+    throw new Error(`${trackingBranch} が見つかりません。先に push して fetch してください。`);
+  }
+
+  // Step 2: HEAD が対象ブランチかチェック
+  const head = state.refStore.getHead();
+  if (head.type !== "branch" || head.name !== branchName) {
+    throw new Error(
+      `pull するには HEAD が "${branchName}" を指している必要があります。` +
+      `現在の HEAD: ${head.type === "branch" ? head.name : "(detached)"}`
+    );
+  }
+
+  const localCommitId = state.refStore.getBranch(branchName);
+  if (localCommitId === trackingCommitId) {
+    state.notification = `Already up-to-date: ${branchName} はすでに ${remoteName} と同じです`;
+    return state;
+  }
+
+  // Step 3: merge origin/branchName → branchName
+  // MergeEngine を使って merge を試みる
+  const mergeEngine = new MergeEngine(state.objectStore, state.refStore);
+  const result = mergeEngine.merge(trackingBranch, branchName);
+
+  switch (result.type) {
+    case "fast-forward":
+      state.notification = `pull 完了 (fast-forward): ${branchName} を ${trackingBranch} に合わせました`;
+      addStep(state, {
+        action: "PULL",
+        description: `pull (fast-forward): ${trackingBranch} → ${branchName}`,
+        objectsCreated: [],
+        refsUpdated: [branchName],
+      });
+      break;
+
+    case "normal": {
+      const mergeCommit = (result as { type: "normal"; mergeCommit: { id: ObjectId } }).mergeCommit;
+      state.notification = `pull 完了 (merge commit): ${mergeCommit.id.slice(0, 6)}`;
+      addStep(state, {
+        action: "PULL",
+        description: `pull (merge): ${trackingBranch} → ${branchName} (merge commit: ${mergeCommit.id.slice(0, 6)})`,
+        objectsCreated: [mergeCommit.id],
+        refsUpdated: [branchName],
+      });
+      break;
+    }
+
+    case "conflict": {
+      const conflictResult = result as { type: "conflict"; conflicts: import("../core/types").ConflictEntry[] };
+      state.mergeState = {
+        sourceBranch: trackingBranch,
+        targetBranch: branchName,
+        conflicts: conflictResult.conflicts,
+        resolved: new Map(),
+      };
+      state.notification = `pull: conflict が発生しました。Conflict解決パネルで解決してください`;
+      addStep(state, {
+        action: "PULL",
+        description: `pull: conflict 発生 (${conflictResult.conflicts.length} conflicts)`,
+        objectsCreated: [],
+        refsUpdated: [],
+      });
+      break;
+    }
+  }
+
   return state;
 }
 

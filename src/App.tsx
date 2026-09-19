@@ -119,6 +119,7 @@ const LEGEND_ITEMS: { label: string; color: string; shape: string; category: str
   { label: "Commit", color: COLORS.commit, shape: "●", category: "不変オブジェクト" },
   { label: "Branch", color: COLORS.branch, shape: "🏷", category: "可変参照" },
   { label: "HEAD", color: COLORS.head, shape: "➤", category: "可変参照" },
+  { label: "origin/xxx", color: "#0EA5E9", shape: "🌐", category: "リモートブランチ" },
 ];
 
 function Legend() {

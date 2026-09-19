@@ -3,6 +3,7 @@ import { useSimulator } from "../../state/use-simulator";
 import type { ObjectId, TreeEntry, GitObject, BlobWord1, BlobWord2, BlobContent } from "../../core/types";
 import { BLOB_WORD1, BLOB_WORD2 } from "../../core/types";
 import { formatObjectId } from "../id-format";
+import { RemotePanel } from "./RemotePanel";
 
 // =============================================================================
 // CommandPanel - 操作パネル（左サイドバー）
@@ -846,11 +847,11 @@ function FixPanel() {
 }
 
 // =============================================================================
-// CommandPanel - メインエクスポート（低レベル / 高レベル タブ切替）
+// CommandPanel - メインエクスポート（低レベル / 高レベル / リモート タブ切替）
 // =============================================================================
 
 export function CommandPanel() {
-  const [tab, setTab] = useState<"low" | "high">("low");
+  const [tab, setTab] = useState<"low" | "high" | "remote">("low");
 
   const tabBase: React.CSSProperties = {
     flex: 1,
@@ -886,10 +887,20 @@ export function CommandPanel() {
       {/* タブヘッダー */}
       <div style={{ display: "flex", borderBottom: `1px solid ${COLORS.border}`, background: "#fff", flexShrink: 0 }}>
         <button style={tab === "low" ? tabActive : tabBase} onClick={() => setTab("low")}>
-          低レベル操作
+          低レベル
         </button>
         <button style={tab === "high" ? tabActive : tabBase} onClick={() => setTab("high")}>
-          高レベル操作
+          高レベル
+        </button>
+        <button
+          style={{
+            ...(tab === "remote" ? tabActive : tabBase),
+            borderBottomColor: tab === "remote" ? "#0EA5E9" : "transparent",
+            color: tab === "remote" ? "#0369A1" : COLORS.muted,
+          }}
+          onClick={() => setTab("remote")}
+        >
+          🌐 リモート
         </button>
       </div>
 
@@ -901,6 +912,8 @@ export function CommandPanel() {
             <MergePanel />
             <FixPanel />
           </>
+        ) : tab === "remote" ? (
+          <RemotePanel />
         ) : (
           <>
             <BlobCreator />
